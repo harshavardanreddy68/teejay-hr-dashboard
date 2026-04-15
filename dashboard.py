@@ -3,76 +3,18 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 import plotly.express as px
-import os
 import requests
 
-st.set_page_config(page_title="Teejay HR Dashboard", layout="wide")
+st.set_page_config(page_title="HR AI Dashboard", layout="wide")
 
 # ================================
-# 🎨 PREMIUM UI STYLING
+# 🔑 GOOGLE API KEY (PUT HERE)
 # ================================
-
-st.markdown("""
-<style>
-/* Background */
-.stApp {
-    background: linear-gradient(to right, #0f172a, #020617);
-    color: white;
-}
-
-/* Header */
-.header {
-    padding: 20px;
-    border-radius: 15px;
-    background: linear-gradient(135deg, #2563eb, #1e3a8a);
-    color: white;
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-/* KPI Cards */
-.card {
-    background: rgba(255,255,255,0.05);
-    padding: 20px;
-    border-radius: 15px;
-    text-align: center;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.1);
-}
-
-/* Section Box */
-.section {
-    background: rgba(255,255,255,0.03);
-    padding: 15px;
-    border-radius: 15px;
-    margin-top: 10px;
-}
-
-/* Sidebar */
-.css-1d391kg {
-    background-color: #020617;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ================================
-# 🎯 HEADER
-# ================================
-
-st.markdown("""
-<div class="header">
-    <h1>🏢 Teejay India Pvt Ltd</h1>
-    <p>Smart HR Analytics Dashboard</p>
-</div>
-""", unsafe_allow_html=True)
-
-FILE_PATH = "employees_with_coords.xlsx"
 GOOGLE_API_KEY = "https://maps.googleapis.com/maps/api/geocode/json?latlng=40.714224,-73.961452&key=YOUR_API_KEY"
 
 # ================================
-# 🔹 GOOGLE FUNCTION
+# 🌍 GOOGLE FUNCTION
 # ================================
-
 def get_lat_lon(address):
     url = "https://maps.googleapis.com/maps/api/geocode/json"
     params = {"address": address, "key": GOOGLE_API_KEY}
@@ -89,119 +31,123 @@ def get_lat_lon(address):
 
     return None, None
 
+# ================================
+# 🌌 UI STYLE
+# ================================
+st.markdown("""
+<style>
+.stApp {
+    background: radial-gradient(circle at top, #020617, #000000);
+    color: #e2e8f0;
+}
+.header {
+    padding: 25px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    text-align: center;
+}
+div.stButton > button {
+    width: 100%;
+    height: 90px;
+    font-size: 18px;
+    border-radius: 15px;
+}
+.section {
+    background: rgba(255,255,255,0.03);
+    padding: 15px;
+    border-radius: 15px;
+    margin-top: 15px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ================================
-# 🔹 LOAD DATA
+# HEADER
 # ================================
-
-if os.path.exists(FILE_PATH):
-    df = pd.read_excel(FILE_PATH)
-else:
-    df = pd.read_excel("employees.xlsx")
-    df["lat"] = None
-    df["lon"] = None
-
+st.markdown("""
+<div class="header">
+<h1>🚀 Teejay India Pvt Ltd</h1>
+<p>AI HR Dashboard</p>
+</div>
+""", unsafe_allow_html=True)
 
 # ================================
-# 🛠️ SIDEBAR (CLEAN)
+# LOAD DATA
 # ================================
+df = pd.read_excel("employees_with_coords.xlsx")
 
-st.sidebar.title("⚙ Manage Employees")
+# ================================
+# ➕ ADD EMPLOYEE (WITH AUTO LOCATION)
+# ================================
+st.sidebar.title("➕ Add Employee")
 
-action = st.sidebar.selectbox("Action", ["Add", "Edit", "Delete"])
+with st.sidebar.form("add"):
+    name = st.text_input("Name")
+    dept = st.text_input("Department")
+    sub = st.text_input("Sub Section")
+    addr = st.text_area("Address")
 
-# ➕ ADD
-if action == "Add":
-    with st.sidebar.form("add"):
-        emp_id = st.text_input("Employee ID")
-        name = st.text_input("Name")
-        dept = st.text_input("Department")
-        sub = st.text_input("Sub Section")
-        addr = st.text_area("Address")
+    if st.form_submit_button("Add"):
+        lat, lon = get_lat_lon(addr)
 
-        if st.form_submit_button("Add"):
-            lat, lon = get_lat_lon(addr)
+        new = {
+            "Name": name,
+            "Department": dept,
+            "Sub Section": sub,
+            "Address": addr,
+            "lat": lat,
+            "lon": lon
+        }
 
-            df = pd.concat([df, pd.DataFrame([{
-                "Emp Id": emp_id,
-                "Name": name,
-                "Department": dept,
-                "Sub Section": sub,
-                "Address": addr,
-                "lat": lat,
-                "lon": lon
-            }])])
+        df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
+        df.to_excel("employees_with_coords.xlsx", index=False)
 
-            df.to_excel(FILE_PATH, index=False)
-            st.success("Added")
-            st.rerun()
-
-# ✏️ EDIT
-elif action == "Edit":
-    emp = st.sidebar.selectbox("Select Employee", df["Name"])
-    row = df[df["Name"] == emp].iloc[0]
-
-    with st.sidebar.form("edit"):
-        name = st.text_input("Name", row["Name"])
-        dept = st.text_input("Dept", row["Department"])
-        sub = st.text_input("Sub", row["Sub Section"])
-        addr = st.text_area("Address", row["Address"])
-
-        if st.form_submit_button("Update"):
-            lat, lon = get_lat_lon(addr)
-
-            df.loc[df["Name"] == emp,
-                   ["Name","Department","Sub Section","Address","lat","lon"]] = [
-                name, dept, sub, addr, lat, lon
-            ]
-
-            df.to_excel(FILE_PATH, index=False)
-            st.success("Updated")
-            st.rerun()
-
-# ❌ DELETE
-elif action == "Delete":
-    emp = st.sidebar.selectbox("Delete Employee", df["Name"])
-    if st.sidebar.button("Delete"):
-        df = df[df["Name"] != emp]
-        df.to_excel(FILE_PATH, index=False)
-        st.success("Deleted")
+        st.success("Added with location")
         st.rerun()
 
-
 # ================================
-# 🔍 FILTERS
+# KPI FILTER
 # ================================
-
-st.sidebar.title("🔍 Filters")
-
-dept = st.sidebar.selectbox("Department", ["All"] + list(df["Department"].dropna().unique()))
-search = st.sidebar.text_input("Search")
-
-filtered_df = df.copy()
-
-if dept != "All":
-    filtered_df = filtered_df[filtered_df["Department"] == dept]
-
-if search:
-    filtered_df = filtered_df[filtered_df["Name"].str.contains(search, case=False, na=False)]
-
-
-# ================================
-# 📊 KPI CARDS
-# ================================
+if "filter_type" not in st.session_state:
+    st.session_state.filter_type = "All"
 
 c1, c2, c3 = st.columns(3)
 
-c1.markdown(f'<div class="card"><h3>{len(df)}</h3><p>Total Employees</p></div>', unsafe_allow_html=True)
-c2.markdown(f'<div class="card"><h3>{len(filtered_df)}</h3><p>Filtered</p></div>', unsafe_allow_html=True)
-c3.markdown(f'<div class="card"><h3>{df["Department"].nunique()}</h3><p>Departments</p></div>', unsafe_allow_html=True)
+if c1.button(f"👥 Total\n{len(df)}"):
+    st.session_state.filter_type = "All"
 
+if c2.button(f"🏢 Dept\n{df['Department'].nunique()}"):
+    st.session_state.filter_type = "Department"
+
+if c3.button(f"🧩 Sub\n{df['Sub Section'].nunique()}"):
+    st.session_state.filter_type = "Sub"
 
 # ================================
-# 🌍 MAP SECTION
+# FILTER LOGIC
 # ================================
+filtered_df = df.copy()
 
+if st.session_state.filter_type == "Department":
+    dept = st.selectbox("Select Department", df["Department"].unique())
+    filtered_df = df[df["Department"] == dept]
+
+elif st.session_state.filter_type == "Sub":
+    sub = st.selectbox("Select Sub Section", df["Sub Section"].unique())
+    filtered_df = df[df["Sub Section"] == sub]
+
+# ================================
+# SEARCH
+# ================================
+search = st.text_input("🔍 Search Employee")
+
+if search:
+    filtered_df = filtered_df[
+        filtered_df["Name"].str.contains(search, case=False, na=False)
+    ]
+
+# ================================
+# 🌍 MAP
+# ================================
 st.markdown('<div class="section">', unsafe_allow_html=True)
 st.subheader("🌍 Employee Map")
 
@@ -212,42 +158,39 @@ cluster = MarkerCluster().add_to(m)
 
 for _, row in filtered_df.iterrows():
     if pd.notna(row["lat"]):
+
+        popup_html = f"""
+        <div style="width:250px;">
+            <h4>👤 {row['Name']}</h4>
+            <b>Dept:</b> {row['Department']}<br>
+            <b>Sub:</b> {row['Sub Section']}<br>
+            <b>Address:</b> {row['Address']}
+        </div>
+        """
+
         folium.Marker(
             [row["lat"], row["lon"]],
-            popup=f"{row['Name']}<br>{row['Department']}"
+            popup=folium.Popup(popup_html, max_width=300)
         ).add_to(cluster)
 
-st_folium(m, width="100%", height=750)
+st_folium(m, width=None, height=750)
 st.markdown('</div>', unsafe_allow_html=True)
-
-
-# ================================
-# 📋 TABLE
-# ================================
-
-st.markdown('<div class="section">', unsafe_allow_html=True)
-st.subheader("📋 Employee Directory")
-st.dataframe(filtered_df, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
-
 
 # ================================
 # 📊 GRAPH
 # ================================
-
 st.markdown('<div class="section">', unsafe_allow_html=True)
-st.subheader("📊 Department Insights")
+st.subheader("📊 Department Analytics")
 
-dept_counts = df["Department"].value_counts().reset_index()
+dept_counts = filtered_df["Department"].value_counts().reset_index()
 dept_counts.columns = ["Department","Count"]
 
-fig = px.bar(
-    dept_counts,
-    x="Department",
-    y="Count",
-    color="Department",
-    template="plotly_dark"
-)
-
+fig = px.bar(dept_counts, x="Department", y="Count", color="Department")
 st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+
+# ================================
+# 📋 TABLE
+# ================================
+st.markdown('<div class="section">', unsafe_allow_html=True)
+st.subheader("📋 Employee Table")
+st.dataframe(filtered_df, use_container_width=True)
