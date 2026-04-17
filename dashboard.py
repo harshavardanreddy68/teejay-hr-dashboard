@@ -4,8 +4,6 @@ import plotly.express as px
 import folium
 from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
-from geopy.geocoders import Nominatim
-import time
 
 # =====================================================
 # PAGE CONFIG
@@ -17,28 +15,11 @@ st.set_page_config(
 )
 
 # =====================================================
-# GOOGLE SHEET CONFIG
+# GOOGLE SHEET CONFIG (WORKING READ-ONLY VERSION)
 # =====================================================
 FILE_ID = "10w4-LNlg0QtB45kYXMQuTzPURRt9wx-5_TiYkgdrY00"
 
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=csv"
-
-# =====================================================
-# FREE GEOCODER (NO API KEY)
-# =====================================================
-geolocator = Nominatim(user_agent="teejay_hr_dashboard")
-
-def get_lat_lon(address):
-    try:
-        location = geolocator.geocode(address, timeout=10)
-
-        if location:
-            return location.latitude, location.longitude
-
-    except:
-        pass
-
-    return None, None
 
 # =====================================================
 # STYLE
@@ -87,42 +68,19 @@ def load_data():
         .str.replace(" ", "_")
     )
 
-    needed = [
-        "emp_id",
-        "name",
-        "department",
-        "sub_section",
-        "address",
-        "lat",
-        "lon"
-    ]
+    # flexible columns
+    needed = ["emp_id","name","department","sub_section","address","lat","lon"]
 
     for col in needed:
         if col not in df.columns:
             df[col] = None
 
-    # Auto geocode rows with missing lat/lon
-    for i, row in df.iterrows():
-
-        lat_missing = pd.isna(row["lat"]) or row["lat"] == ""
-        lon_missing = pd.isna(row["lon"]) or row["lon"] == ""
-
-        if lat_missing or lon_missing:
-            if pd.notna(row["address"]):
-                lat, lon = get_lat_lon(str(row["address"]))
-                df.at[i, "lat"] = lat
-                df.at[i, "lon"] = lon
-                time.sleep(0.2)
-
     return df
 
-# =====================================================
-# LOAD
-# =====================================================
 try:
     df = load_data()
 except:
-    st.error("Google Sheet connection failed.")
+    st.error("Google Sheet connection failed. Check sharing settings.")
     st.stop()
 
 # =====================================================
@@ -160,7 +118,7 @@ if search:
 # MAP
 # =====================================================
 st.markdown('<div class="section">', unsafe_allow_html=True)
-st.subheader("🌍 Employee Live Map")
+st.subheader("🌍 Live Employee Map")
 
 m = folium.Map(
     location=[17.6868, 83.2185],
@@ -223,13 +181,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 st.markdown('<div class="section">', unsafe_allow_html=True)
 st.subheader("📋 Employee Directory")
 
-show_cols = [
-    "emp_id",
-    "name",
-    "department",
-    "sub_section",
-    "address"
-]
+show_cols = ["emp_id","name","department","sub_section","address"]
 
 st.dataframe(
     df[show_cols],
@@ -241,4 +193,4 @@ st.markdown("</div>", unsafe_allow_html=True)
 # =====================================================
 # FOOTER
 # =====================================================
-st.caption("🔄 Auto refresh every 25s sec | Address auto-converts to map location")
+st.caption("🔄 Data auto-refreshes every 60 seconds from Google Sheet")
