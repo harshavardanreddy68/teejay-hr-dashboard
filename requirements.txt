@@ -1,8 +1,9 @@
 streamlit
 pandas
-folium
 plotly
+folium
 streamlit-folium
-requests
+gspread
+google-auth
+geopy
 openpyxl
-supabase
