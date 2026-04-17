@@ -3,7 +3,4 @@ pandas
 plotly
 folium
 streamlit-folium
-gspread
-google-auth
-geopy
-openpyxl
+streamlit-autorefresh
