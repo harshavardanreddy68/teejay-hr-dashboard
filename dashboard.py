@@ -5,6 +5,7 @@ import folium
 from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
 from streamlit_autorefresh import st_autorefresh
+import time
 
 # =====================================================
 # PAGE CONFIG
@@ -21,10 +22,11 @@ st.set_page_config(
 st_autorefresh(interval=5000, key="refresh")
 
 # =====================================================
-# GOOGLE SHEET CONFIG
+# GOOGLE SHEET LIVE CONFIG
 # =====================================================
 FILE_ID = "10w4-LNlg0QtB45kYXMQuTzPURRt9wx-5_TiYkgdrY00"
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=csv"
+
+CSV_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=csv&t={int(time.time())}"
 
 # =====================================================
 # STYLE
@@ -115,7 +117,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================
-# CLICKABLE KPI FILTERS
+# KPI FILTERS
 # =====================================================
 if "view_mode" not in st.session_state:
     st.session_state.view_mode = "all"
@@ -147,7 +149,7 @@ if search:
     ]
 
 # =====================================================
-# FILTER MODE
+# FILTERS
 # =====================================================
 if st.session_state.view_mode == "department":
     dept = st.selectbox(
@@ -200,6 +202,7 @@ for _, row in df.iterrows():
         pass
 
 st_folium(m, width=None, height=650)
+
 st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================
@@ -220,6 +223,7 @@ fig = px.bar(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
 st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================
@@ -246,4 +250,4 @@ st.markdown("</div>", unsafe_allow_html=True)
 # =====================================================
 # FOOTER
 # =====================================================
-st.caption("🔄 Auto-refreshing every 5 seconds | Live Google Sheet Data")
+st.caption("🔄 Live updating every 5 seconds | Google Sheet Connected")
