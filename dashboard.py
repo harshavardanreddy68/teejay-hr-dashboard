@@ -18,7 +18,7 @@ st.set_page_config(
 # GOOGLE SHEET CONFIG
 # =====================================================
 # Replace with your Google Sheet File ID
-FILE_ID = "https://docs.google.com/spreadsheets/d/1F0BAUs5nt1knAtbazPyw3hydvDgl2yHI/edit?usp=sharing&ouid=109821000672586326690&rtpof=true&sd=true"
+FILE_ID = "10w4-LNlg0QtB45kYXMQuTzPURRt9wx-5_TiYkgdrY00"
 
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=csv"
 
