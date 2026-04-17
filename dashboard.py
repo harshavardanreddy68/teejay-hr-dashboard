@@ -17,7 +17,6 @@ st.set_page_config(
 # =====================================================
 # GOOGLE SHEET CONFIG
 # =====================================================
-# Replace with your Google Sheet File ID
 FILE_ID = "10w4-LNlg0QtB45kYXMQuTzPURRt9wx-5_TiYkgdrY00"
 
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=csv"
@@ -46,14 +45,6 @@ section[data-testid="stSidebar"]{
     background:linear-gradient(135deg,#2563eb,#1d4ed8);
     text-align:center;
     margin-bottom:18px;
-}
-
-.card{
-    background:rgba(255,255,255,0.05);
-    padding:18px;
-    border-radius:15px;
-    text-align:center;
-    border:1px solid rgba(255,255,255,0.06);
 }
 
 .section{
@@ -86,6 +77,7 @@ def load_data():
     )
 
     needed = [
+        "emp_id",
         "name",
         "department",
         "sub_section",
@@ -101,12 +93,12 @@ def load_data():
     return df
 
 # =====================================================
-# MAIN LOAD
+# LOAD
 # =====================================================
 try:
     df = load_data()
 except:
-    st.error("Google Sheet connection failed. Check File ID / Sharing Access.")
+    st.error("Google Sheet connection failed.")
     st.stop()
 
 # =====================================================
@@ -120,61 +112,31 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================
-# KPI FILTER BUTTONS
+# KPI
 # =====================================================
-if "view_mode" not in st.session_state:
-    st.session_state.view_mode = "all"
-
 c1, c2, c3 = st.columns(3)
 
-with c1:
-    if st.button(f"👥 Total Employees\n{len(df)}"):
-        st.session_state.view_mode = "all"
-
-with c2:
-    if st.button(f"🏢 Departments\n{df['department'].nunique()}"):
-        st.session_state.view_mode = "dept"
-
-with c3:
-    if st.button(f"🧩 Sub Sections\n{df['sub_section'].nunique()}"):
-        st.session_state.view_mode = "sub"
-
-# =====================================================
-# FILTERING
-# =====================================================
-filtered_df = df.copy()
-
-if st.session_state.view_mode == "dept":
-    opts = sorted(df["department"].dropna().unique())
-    if opts:
-        pick = st.selectbox("Select Department", opts)
-        filtered_df = df[df["department"] == pick]
-
-elif st.session_state.view_mode == "sub":
-    opts = sorted(df["sub_section"].dropna().unique())
-    if opts:
-        pick = st.selectbox("Select Sub Section", opts)
-        filtered_df = df[df["sub_section"] == pick]
+c1.metric("👥 Total Employees", len(df))
+c2.metric("🏢 Departments", df["department"].nunique())
+c3.metric("🧩 Sub Sections", df["sub_section"].nunique())
 
 # =====================================================
 # SEARCH
 # =====================================================
-search = st.text_input("🔍 Search Employee")
+search = st.text_input("🔍 Search by Employee ID / Name")
 
 if search:
-    filtered_df = filtered_df[
-        filtered_df["name"].astype(str).str.contains(
-            search,
-            case=False,
-            na=False
-        )
+    df = df[
+        df["name"].astype(str).str.contains(search, case=False, na=False)
+        |
+        df["emp_id"].astype(str).str.contains(search, case=False, na=False)
     ]
 
 # =====================================================
 # MAP
 # =====================================================
 st.markdown('<div class="section">', unsafe_allow_html=True)
-st.subheader("🌍 Employee Location Map")
+st.subheader("🌍 Employee Map")
 
 m = folium.Map(
     location=[17.6868, 83.2185],
@@ -183,14 +145,15 @@ m = folium.Map(
 
 cluster = MarkerCluster().add_to(m)
 
-for _, row in filtered_df.iterrows():
+for _, row in df.iterrows():
     try:
         lat = float(row["lat"])
         lon = float(row["lon"])
 
         popup = f"""
-        <div style='width:240px'>
+        <div style='width:250px'>
         <h4>{row['name']}</h4>
+        <b>Employee ID:</b> {row['emp_id']}<br>
         <b>Department:</b> {row['department']}<br>
         <b>Sub Section:</b> {row['sub_section']}<br>
         <b>Address:</b> {row['address']}
@@ -212,14 +175,9 @@ st.markdown("</div>", unsafe_allow_html=True)
 # GRAPH
 # =====================================================
 st.markdown('<div class="section">', unsafe_allow_html=True)
-st.subheader("📊 Department Analytics")
+st.subheader("📊 Department Distribution")
 
-chart = (
-    filtered_df["department"]
-    .value_counts()
-    .reset_index()
-)
-
+chart = df["department"].value_counts().reset_index()
 chart.columns = ["Department", "Count"]
 
 fig = px.bar(
@@ -239,8 +197,16 @@ st.markdown("</div>", unsafe_allow_html=True)
 st.markdown('<div class="section">', unsafe_allow_html=True)
 st.subheader("📋 Employee Directory")
 
+show_cols = [
+    "emp_id",
+    "name",
+    "department",
+    "sub_section",
+    "address"
+]
+
 st.dataframe(
-    filtered_df,
+    df[show_cols],
     use_container_width=True
 )
 
@@ -249,4 +215,4 @@ st.markdown("</div>", unsafe_allow_html=True)
 # =====================================================
 # FOOTER
 # =====================================================
-st.caption("🔄 Auto refresh every 60 seconds from Google Sheets")
+st.caption("🔄 Auto-sync from Google Sheet every 60 seconds")
