@@ -4,6 +4,7 @@ import plotly.express as px
 import folium
 from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
+from streamlit_autorefresh import st_autorefresh
 
 # =====================================================
 # PAGE CONFIG
@@ -13,6 +14,11 @@ st.set_page_config(
     layout="wide",
     page_icon="🏢"
 )
+
+# =====================================================
+# AUTO REFRESH EVERY 5 SECONDS
+# =====================================================
+st_autorefresh(interval=5000, key="refresh")
 
 # =====================================================
 # GOOGLE SHEET CONFIG
@@ -51,14 +57,21 @@ height:70px;
 border-radius:14px;
 font-size:18px;
 font-weight:bold;
+background:#111827;
+color:white;
+border:1px solid #374151;
+}
+
+div.stButton > button:hover{
+background:#2563eb;
+color:white;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================================
-# LOAD DATA
+# LOAD LIVE DATA (NO CACHE)
 # =====================================================
-@st.cache_data(ttl=60)
 def load_data():
     df = pd.read_csv(CSV_URL)
 
@@ -69,7 +82,15 @@ def load_data():
         .str.replace(" ", "_")
     )
 
-    needed = ["emp_id", "name", "department", "sub_section", "address", "lat", "lon"]
+    needed = [
+        "emp_id",
+        "name",
+        "department",
+        "sub_section",
+        "address",
+        "lat",
+        "lon"
+    ]
 
     for col in needed:
         if col not in df.columns:
@@ -80,7 +101,7 @@ def load_data():
 try:
     df = load_data()
 except:
-    st.error("Google Sheet connection failed. Check sharing settings.")
+    st.error("Google Sheet connection failed.")
     st.stop()
 
 # =====================================================
@@ -89,7 +110,7 @@ except:
 st.markdown("""
 <div class="header">
 <h1>🏢 Teejay India Pvt Ltd</h1>
-<p>Live HR Analytics Dashboard</p>
+<p>Real-Time HR Analytics Dashboard</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -126,7 +147,7 @@ if search:
     ]
 
 # =====================================================
-# FILTER LOGIC
+# FILTER MODE
 # =====================================================
 if st.session_state.view_mode == "department":
     dept = st.selectbox(
@@ -161,7 +182,7 @@ for _, row in df.iterrows():
         lon = float(row["lon"])
 
         popup = f"""
-        <div style='width:250px'>
+        <div style='width:260px'>
         <h4>{row['name']}</h4>
         <b>ID:</b> {row['emp_id']}<br>
         <b>Department:</b> {row['department']}<br>
@@ -182,7 +203,7 @@ st_folium(m, width=None, height=650)
 st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================
-# GRAPH
+# CHART
 # =====================================================
 st.markdown('<div class="section">', unsafe_allow_html=True)
 st.subheader("📊 Department Distribution")
@@ -207,7 +228,13 @@ st.markdown("</div>", unsafe_allow_html=True)
 st.markdown('<div class="section">', unsafe_allow_html=True)
 st.subheader("📋 Employee Directory")
 
-show_cols = ["emp_id", "name", "department", "sub_section", "address"]
+show_cols = [
+    "emp_id",
+    "name",
+    "department",
+    "sub_section",
+    "address"
+]
 
 st.dataframe(
     df[show_cols],
@@ -219,4 +246,4 @@ st.markdown("</div>", unsafe_allow_html=True)
 # =====================================================
 # FOOTER
 # =====================================================
-st.caption("🔄 Data auto-refreshes every 60 seconds from Google Sheet")
+st.caption("🔄 Auto-refreshing every 5 seconds | Live Google Sheet Data")
