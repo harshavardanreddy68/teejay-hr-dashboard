@@ -15,10 +15,9 @@ st.set_page_config(
 )
 
 # =====================================================
-# GOOGLE SHEET CONFIG (WORKING READ-ONLY VERSION)
+# GOOGLE SHEET CONFIG
 # =====================================================
 FILE_ID = "10w4-LNlg0QtB45kYXMQuTzPURRt9wx-5_TiYkgdrY00"
-
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=csv"
 
 # =====================================================
@@ -46,10 +45,12 @@ border-radius:15px;
 margin-top:14px;
 }
 
-div[data-testid="metric-container"]{
-background:rgba(255,255,255,0.04);
-padding:15px;
+div.stButton > button{
+width:100%;
+height:70px;
 border-radius:14px;
+font-size:18px;
+font-weight:bold;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -68,8 +69,7 @@ def load_data():
         .str.replace(" ", "_")
     )
 
-    # flexible columns
-    needed = ["emp_id","name","department","sub_section","address","lat","lon"]
+    needed = ["emp_id", "name", "department", "sub_section", "address", "lat", "lon"]
 
     for col in needed:
         if col not in df.columns:
@@ -94,13 +94,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================
-# KPI
+# CLICKABLE KPI FILTERS
 # =====================================================
+if "view_mode" not in st.session_state:
+    st.session_state.view_mode = "all"
+
 c1, c2, c3 = st.columns(3)
 
-c1.metric("👥 Total Employees", len(df))
-c2.metric("🏢 Departments", df["department"].nunique())
-c3.metric("🧩 Sub Sections", df["sub_section"].nunique())
+with c1:
+    if st.button(f"👥 Total Employees\n{len(df)}"):
+        st.session_state.view_mode = "all"
+
+with c2:
+    if st.button(f"🏢 Departments\n{df['department'].nunique()}"):
+        st.session_state.view_mode = "department"
+
+with c3:
+    if st.button(f"🧩 Sub Sections\n{df['sub_section'].nunique()}"):
+        st.session_state.view_mode = "sub"
 
 # =====================================================
 # SEARCH
@@ -113,6 +124,23 @@ if search:
         |
         df["emp_id"].astype(str).str.contains(search, case=False, na=False)
     ]
+
+# =====================================================
+# FILTER LOGIC
+# =====================================================
+if st.session_state.view_mode == "department":
+    dept = st.selectbox(
+        "Select Department",
+        sorted(df["department"].dropna().unique())
+    )
+    df = df[df["department"] == dept]
+
+elif st.session_state.view_mode == "sub":
+    sub = st.selectbox(
+        "Select Sub Section",
+        sorted(df["sub_section"].dropna().unique())
+    )
+    df = df[df["sub_section"] == sub]
 
 # =====================================================
 # MAP
@@ -151,11 +179,10 @@ for _, row in df.iterrows():
         pass
 
 st_folium(m, width=None, height=650)
-
 st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================
-# CHART
+# GRAPH
 # =====================================================
 st.markdown('<div class="section">', unsafe_allow_html=True)
 st.subheader("📊 Department Distribution")
@@ -172,7 +199,6 @@ fig = px.bar(
 )
 
 st.plotly_chart(fig, use_container_width=True)
-
 st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================
@@ -181,7 +207,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 st.markdown('<div class="section">', unsafe_allow_html=True)
 st.subheader("📋 Employee Directory")
 
-show_cols = ["emp_id","name","department","sub_section","address"]
+show_cols = ["emp_id", "name", "department", "sub_section", "address"]
 
 st.dataframe(
     df[show_cols],
