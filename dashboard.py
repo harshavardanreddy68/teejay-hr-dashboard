@@ -24,7 +24,7 @@ st_autorefresh(interval=5000, key="refresh")
 # =====================================================
 # GOOGLE SHEET LIVE CONFIG
 # =====================================================
-FILE_ID = "https://docs.google.com/spreadsheets/d/1W50dZdRyBuUeUH89GneNnovXDv_dp0NqFV31XKz08Pc/edit?usp=sharing"
+FILE_ID = "1W50dZdRyBuUeUH89GneNnovXDv_dp0NqFV31XKz08Pc"
 
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=csv&t={int(time.time())}"
 
