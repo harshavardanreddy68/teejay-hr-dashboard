@@ -4,6 +4,9 @@ import plotly.express as px
 import folium
 from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
+import gspread
+from google.oauth2.service_account import Credentials
+from geopy.geocoders import Nominatim
 
 # =====================================================
 # PAGE CONFIG
@@ -17,57 +20,49 @@ st.set_page_config(
 # =====================================================
 # GOOGLE SHEET CONFIG
 # =====================================================
-FILE_ID = "10w4-LNlg0QtB45kYXMQuTzPURRt9wx-5_TiYkgdrY00"
-
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{FILE_ID}/export?format=csv"
+SHEET_ID = "10w4-LNlg0QtB45kYXMQuTzPURRt9wx-5_TiYkgdrY00"
+WORKSHEET_NAME = "Sheet1"   # change if needed
 
 # =====================================================
-# UI STYLE
+# GOOGLE SERVICE ACCOUNT JSON
+# Put credentials in .streamlit/secrets.toml
 # =====================================================
-st.markdown("""
-<style>
-.stApp{
-    background:linear-gradient(135deg,#020617,#0f172a);
-    color:white;
-}
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
 
-section[data-testid="stSidebar"]{
-    background:#111827;
-}
+creds_dict = dict(st.secrets["gcp_service_account"])
 
-.block-container{
-    padding-top:1rem;
-}
+credentials = Credentials.from_service_account_info(
+    creds_dict,
+    scopes=scope
+)
 
-.header{
-    padding:22px;
-    border-radius:18px;
-    background:linear-gradient(135deg,#2563eb,#1d4ed8);
-    text-align:center;
-    margin-bottom:18px;
-}
+gc = gspread.authorize(credentials)
+sheet = gc.open_by_key(SHEET_ID).worksheet(WORKSHEET_NAME)
 
-.section{
-    background:rgba(255,255,255,0.03);
-    padding:16px;
-    border-radius:15px;
-    margin-top:14px;
-}
+# =====================================================
+# GEOCODER
+# =====================================================
+geolocator = Nominatim(user_agent="teejay_hr_dashboard")
 
-div.stButton > button{
-    width:100%;
-    height:55px;
-    border-radius:12px;
-}
-</style>
-""", unsafe_allow_html=True)
+def get_lat_lon(address):
+    try:
+        loc = geolocator.geocode(address, timeout=10)
+        if loc:
+            return loc.latitude, loc.longitude
+    except:
+        pass
+    return None, None
 
 # =====================================================
 # LOAD DATA
 # =====================================================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=30)
 def load_data():
-    df = pd.read_csv(CSV_URL)
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
 
     df.columns = (
         df.columns
@@ -93,13 +88,45 @@ def load_data():
     return df
 
 # =====================================================
-# LOAD
+# SAVE HELPERS
 # =====================================================
-try:
-    df = load_data()
-except:
-    st.error("Google Sheet connection failed.")
-    st.stop()
+def append_employee(row):
+    sheet.append_row(row)
+
+def update_employee(row_number, row):
+    rng = f"A{row_number}:G{row_number}"
+    sheet.update(rng, [row])
+
+def delete_employee(row_number):
+    sheet.delete_rows(row_number)
+
+# =====================================================
+# UI STYLE
+# =====================================================
+st.markdown("""
+<style>
+.stApp{
+background:linear-gradient(135deg,#020617,#0f172a);
+color:white;
+}
+.header{
+padding:22px;
+border-radius:18px;
+background:linear-gradient(135deg,#2563eb,#1d4ed8);
+text-align:center;
+margin-bottom:18px;
+}
+.section{
+background:rgba(255,255,255,0.03);
+padding:16px;
+border-radius:15px;
+margin-top:14px;
+}
+section[data-testid="stSidebar"]{
+background:#111827;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # =====================================================
 # HEADER
@@ -107,9 +134,100 @@ except:
 st.markdown("""
 <div class="header">
 <h1>🏢 Teejay India Pvt Ltd</h1>
-<p>Live HR Analytics Dashboard</p>
+<p>Live HR Dashboard with Employee Management</p>
 </div>
 """, unsafe_allow_html=True)
+
+# =====================================================
+# LOAD DATA
+# =====================================================
+df = load_data()
+
+# =====================================================
+# SIDEBAR CRUD
+# =====================================================
+st.sidebar.title("⚙ Employee Management")
+
+mode = st.sidebar.radio(
+    "Choose Action",
+    ["Add Employee", "Edit Employee", "Delete Employee"]
+)
+
+# ---------------- ADD ----------------
+if mode == "Add Employee":
+    with st.sidebar.form("add_form"):
+        emp_id = st.text_input("Employee ID")
+        name = st.text_input("Name")
+        dept = st.text_input("Department")
+        sub = st.text_input("Sub Section")
+        addr = st.text_area("Address")
+
+        if st.form_submit_button("Add"):
+            lat, lon = get_lat_lon(addr)
+
+            row = [
+                emp_id,
+                name,
+                dept,
+                sub,
+                addr,
+                lat,
+                lon
+            ]
+
+            append_employee(row)
+            st.success("Employee Added")
+            st.cache_data.clear()
+            st.rerun()
+
+# ---------------- EDIT ----------------
+elif mode == "Edit Employee":
+    ids = df["emp_id"].astype(str).tolist()
+
+    selected = st.sidebar.selectbox("Select Employee ID", ids)
+
+    row_df = df[df["emp_id"].astype(str) == selected].iloc[0]
+    idx = df[df["emp_id"].astype(str) == selected].index[0]
+    row_number = idx + 2   # header row + 1
+
+    with st.sidebar.form("edit_form"):
+        name = st.text_input("Name", row_df["name"])
+        dept = st.text_input("Department", row_df["department"])
+        sub = st.text_input("Sub Section", row_df["sub_section"])
+        addr = st.text_area("Address", row_df["address"])
+
+        if st.form_submit_button("Update"):
+            lat, lon = get_lat_lon(addr)
+
+            row = [
+                selected,
+                name,
+                dept,
+                sub,
+                addr,
+                lat,
+                lon
+            ]
+
+            update_employee(row_number, row)
+            st.success("Updated")
+            st.cache_data.clear()
+            st.rerun()
+
+# ---------------- DELETE ----------------
+elif mode == "Delete Employee":
+    ids = df["emp_id"].astype(str).tolist()
+
+    selected = st.sidebar.selectbox("Select Employee ID", ids)
+
+    idx = df[df["emp_id"].astype(str) == selected].index[0]
+    row_number = idx + 2
+
+    if st.sidebar.button("Delete Employee"):
+        delete_employee(row_number)
+        st.success("Deleted")
+        st.cache_data.clear()
+        st.rerun()
 
 # =====================================================
 # KPI
@@ -123,7 +241,7 @@ c3.metric("🧩 Sub Sections", df["sub_section"].nunique())
 # =====================================================
 # SEARCH
 # =====================================================
-search = st.text_input("🔍 Search by Employee ID / Name")
+search = st.text_input("🔍 Search by ID / Name")
 
 if search:
     df = df[
@@ -153,9 +271,9 @@ for _, row in df.iterrows():
         popup = f"""
         <div style='width:250px'>
         <h4>{row['name']}</h4>
-        <b>Employee ID:</b> {row['emp_id']}<br>
-        <b>Department:</b> {row['department']}<br>
-        <b>Sub Section:</b> {row['sub_section']}<br>
+        <b>ID:</b> {row['emp_id']}<br>
+        <b>Dept:</b> {row['department']}<br>
+        <b>Sub:</b> {row['sub_section']}<br>
         <b>Address:</b> {row['address']}
         </div>
         """
@@ -205,14 +323,5 @@ show_cols = [
     "address"
 ]
 
-st.dataframe(
-    df[show_cols],
-    use_container_width=True
-)
-
+st.dataframe(df[show_cols], use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
-
-# =====================================================
-# FOOTER
-# =====================================================
-st.caption("🔄 Auto-sync from Google Sheet every 60 seconds")
